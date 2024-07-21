@@ -15,7 +15,7 @@ export const addPatient = async (req, res) => {
         if (!blockchain.isChainValid()) {
             return res.status(400).json({ message: 'Blockchain is invalid' });
         }
-        const { name, age, disease } = req.body;
+        const { name, age, gender, address, country, disease, reason } = req.body;
         const matricule = generateMatricule();
         const encryptedName = encrypt(name);
         const encryptedAge = encrypt(age.toString());
@@ -23,7 +23,11 @@ export const addPatient = async (req, res) => {
             matricule,
             name: encryptedName,
             age: encryptedAge,
+            gender,
+            address,
+            country,
             disease,
+            reason,
             timestamp: new Date().toISOString()
         };
         blockchain.addBlock(new Block(blockchain.chain.length, newBlock.timestamp, newBlock, blockchain.getLatestBlock().hash));
@@ -48,7 +52,11 @@ export const getPatient = async (req, res) => {
             matricule: block.data.matricule,
             name: decryptedName,
             age: parseInt(decryptedAge, 10),
-            disease: block.data.disease
+            gender: block.data.gender,
+            address: block.data.address,
+            country: block.data.country,
+            disease: block.data.disease,
+            reason: block.data.reason
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -74,6 +82,69 @@ export const getPatientCountByDisease = async (req, res) => {
         const disease = req.params.disease;
         const count = blockchain.diseaseStats[disease] || 0;
         res.status(200).json({ disease, count });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Récupération d'un bloc et de ses données (sans déchiffrer le nom et l'âge)
+export const getBlockByIndex = async (req, res) => {
+    try {
+        const index = parseInt(req.params.index, 10);
+        const block = blockchain.chain[index];
+        if (!block) return res.status(404).json({ message: 'Block not found' });
+
+        const blockData = {
+            index: block.index,
+            timestamp: block.timestamp,
+            previousHash: block.previousHash,
+            hash: block.hash,
+            data: {
+                matricule: block.data.matricule,
+                name: block.data.name,  // Nom chiffré
+                age: block.data.age,    // Âge chiffré
+                gender: block.data.gender,
+                address: block.data.address,
+                country: block.data.country,
+                disease: block.data.disease,
+                reason: block.data.reason
+            }
+        };
+
+        res.status(200).json(blockData);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Récupération des blocs par maladie
+export const getBlocksByDisease = async (req, res) => {
+    try {
+        const disease = req.params.disease;
+        const blocks = blockchain.chain.filter(block => block.data.disease === disease);
+
+        if (blocks.length === 0) {
+            return res.status(404).json({ message: 'No blocks found for the specified disease' });
+        }
+
+        const blockData = blocks.map(block => ({
+            index: block.index,
+            timestamp: block.timestamp,
+            previousHash: block.previousHash,
+            hash: block.hash,
+            data: {
+                matricule: block.data.matricule,
+                name: block.data.name,  // Nom chiffré
+                age: block.data.age,    // Âge chiffré
+                gender: block.data.gender,
+                address: block.data.address,
+                country: block.data.country,
+                disease: block.data.disease,
+                reason: block.data.reason
+            }
+        }));
+
+        res.status(200).json(blockData);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
